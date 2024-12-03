@@ -32,6 +32,9 @@ file_header_template = unset
 # Constructor assignment preferences
 csharp_style_prefer_primary_constructors = false:suggestion
 
+# Namespace declaration preferences
+csharp_style_namespace_declarations = file_scoped:suggestion
+
 # this. and Me. preferences
 dotnet_style_qualification_for_event = false:silent
 dotnet_style_qualification_for_field = false:silent

@@ -36,6 +36,16 @@ public class Email : ValueObject
 
     public static implicit operator string(Email email) => email.Value;
 
+    public static explicit operator Email(string email)
+    {
+        var result = Create(email);
+        if (result.IsFailure)
+        {
+            throw new InvalidOperationException(result.Error);
+        }
+        return result.Value!;
+    }
+
     protected override IEnumerable<object> GetEqualityComponents()
     {
         yield return Value;
