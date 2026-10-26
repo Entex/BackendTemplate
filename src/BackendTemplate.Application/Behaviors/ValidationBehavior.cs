@@ -1,33 +1,27 @@
+using BackendTemplate.Application.Exceptions;
 using FluentValidation;
-
-using MediatR;
+using FluentValidation.Results;
+using Mediator;
 
 namespace BackendTemplate.Application.Behaviors;
 
-public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : notnull
+public sealed class ValidationBehavior<TRequest, TResponse>(IEnumerable<IValidator<TRequest>> validators)
+    : IPipelineBehavior<TRequest, TResponse> where TRequest : IMessage
 {
-    private readonly IEnumerable<IValidator<TRequest>> _validators;
-
-    public ValidationBehavior(IEnumerable<IValidator<TRequest>> validators)
+    public async ValueTask<TResponse> Handle(TRequest request,
+        MessageHandlerDelegate<TRequest, TResponse> next, CancellationToken cancellationToken)
     {
-        _validators = validators;
-    }
+        var failures = new List<ValidationFailure>();
+        // Validators can share scoped dependencies such as a DbContext.
+        foreach (var validator in validators)
+        {
+            var result = await validator.ValidateAsync(request, cancellationToken);
+            failures.AddRange(result.Errors);
+        }
 
-    public async Task<TResponse> Handle(
-        TRequest request,
-        RequestHandlerDelegate<TResponse> next,
-        CancellationToken cancellationToken
-    )
-    {
-        var context = new ValidationContext<TRequest>(request);
+        if (failures.Count > 0)
+            throw new Exceptions.ValidationException(failures);
 
-        var failures = _validators
-            .Select(v => v.Validate(context))
-            .SelectMany(result => result.Errors)
-            .Where(f => f != null)
-            .ToList();
-
-        return failures.Count > 0 ? throw new ValidationException(failures) : await next();
+        return await next(request, cancellationToken);
     }
 }

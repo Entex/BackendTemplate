@@ -1,36 +1,24 @@
-using BackendTemplate.Application.Interface.Repositories.Queries;
+using BackendTemplate.Application.Abstractions;
+using BackendTemplate.Application.Exceptions;
 using BackendTemplate.Application.Requirements.MustHavePermission;
 using BackendTemplate.Application.Requirements.Providers;
-using BackendTemplate.Domain.Entities.Users;
-
-using MediatR;
-
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 
 namespace BackendTemplate.Application.Features.Users.Queries;
 
-public record GetUserByIdQuery(Guid Id) : IRequest<User?>, IAuthorizationRequirementProvider
+public sealed record GetUserByIdQuery(Guid Id) : IRequest<UserResponse>, IAuthorizationRequirementProvider
 {
-    public IEnumerable<IAuthorizationRequirement> GetRequirements()
-    {
-        return
-        [
-            new MustHavePermissionRequirement("View User")
-        ];
-    }
+    public IEnumerable<IAuthorizationRequirement> GetRequirements() =>
+        [new MustHavePermissionRequirement("users:read", Id)];
 }
 
-public class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, User?>
+public sealed class GetUserByIdQueryHandler(IUserRepository users) : IRequestHandler<GetUserByIdQuery, UserResponse>
 {
-    private readonly IUserQueryRepository _userQueryRepository;
-
-    public GetUserByIdQueryHandler(IUserQueryRepository userQueryRepository)
+    public async ValueTask<UserResponse> Handle(GetUserByIdQuery request, CancellationToken cancellationToken)
     {
-        _userQueryRepository = userQueryRepository;
-    }
-
-    public async Task<User?> Handle(GetUserByIdQuery request, CancellationToken cancellationToken)
-    {
-        return await _userQueryRepository.GetByIdAsync(request.Id);
+        var user = await users.GetByIdAsync(request.Id, cancellationToken)
+            ?? throw new NotFoundException("User", request.Id);
+        return UserResponse.FromUser(user);
     }
 }

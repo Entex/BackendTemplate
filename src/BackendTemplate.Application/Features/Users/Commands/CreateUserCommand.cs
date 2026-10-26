@@ -1,49 +1,33 @@
-using AutoMapper;
-
-using BackendTemplate.Application.Interface.Repositories.Commands;
-using BackendTemplate.Application.Interface.Services;
-using BackendTemplate.Application.Requirements.MustHavePermission;
-using BackendTemplate.Application.Requirements.Providers;
+using BackendTemplate.Application.Abstractions;
+using BackendTemplate.Application.Exceptions;
 using BackendTemplate.Domain.Entities.Users;
-
-using MediatR;
-
-using Microsoft.AspNetCore.Authorization;
+using BackendTemplate.Domain.ValueObjects;
+using Mediator;
 
 namespace BackendTemplate.Application.Features.Users.Commands;
 
-public record CreateUserCommand(string FirstName, string LastName, string Email, string Password)
-    : IRequest<Guid>,
-        IAuthorizationRequirementProvider
+// Public registration deliberately accepts no roles, permissions, or administrator flag.
+public sealed record CreateUserCommand(string FirstName, string LastName, string Email, string Password)
+    : IRequest<UserResponse>;
+
+public sealed class CreateUserCommandHandler(
+    IUserRepository users,
+    IPasswordHasher passwordHasher,
+    TimeProvider timeProvider) : IRequestHandler<CreateUserCommand, UserResponse>
 {
-    public IEnumerable<IAuthorizationRequirement> GetRequirements()
+    public async ValueTask<UserResponse> Handle(CreateUserCommand request, CancellationToken cancellationToken)
     {
-        return [new MustHavePermissionRequirement("Create User")];
-    }
-}
+        var emailResult = Email.Create(request.Email);
+        if (emailResult.IsFailure)
+            throw new ValidationException(emailResult.Error);
 
-public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Guid>
-{
-    private readonly IMapper _mapper;
-    private readonly IUserCommandRepository _userCommandRepository;
-    private readonly IPasswordHasher _passwordHasher;
+        var email = emailResult.Value!;
+        if (await users.EmailExistsAsync(email.Value, cancellationToken))
+            throw new ConflictException("A user with this email already exists.");
 
-    public CreateUserCommandHandler(IMapper mapper, IUserCommandRepository userCommandRepository, IPasswordHasher passwordHasher)
-    {
-        _mapper = mapper;
-        _userCommandRepository = userCommandRepository;
-        _passwordHasher = passwordHasher;
-    }
-
-    public async Task<Guid> Handle(CreateUserCommand request, CancellationToken cancellationToken)
-    {
-
-        var user = _mapper.Map<User>(request);
-        user.PasswordHash = _passwordHasher.HashPassword(request.Password, out var passwordSalt);
-        user.PasswordSalt = passwordSalt;
-
-        user = await _userCommandRepository.AddAsync(user);
-
-        return user.Id;
+        var user = User.Create(request.FirstName, request.LastName, email,
+            passwordHasher.HashPassword(request.Password), timeProvider.GetUtcNow());
+        await users.AddAsync(user, cancellationToken);
+        return UserResponse.FromUser(user);
     }
 }

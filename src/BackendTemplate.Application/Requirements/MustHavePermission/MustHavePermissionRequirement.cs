@@ -2,12 +2,4 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace BackendTemplate.Application.Requirements.MustHavePermission;
 
-public class MustHavePermissionRequirement : IAuthorizationRequirement
-{
-    public string Permission { get; }
-
-    public MustHavePermissionRequirement(string permission)
-    {
-        Permission = permission;
-    }
-}
+public sealed record MustHavePermissionRequirement(string Permission, Guid? OwnerId = null) : IAuthorizationRequirement;

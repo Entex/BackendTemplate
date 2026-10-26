@@ -485,3 +485,11 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Local databases and environment secrets
+.aspire/
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.*

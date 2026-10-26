@@ -1,52 +1,24 @@
-using BackendTemplate.Application.Interface.Repositories.Queries;
-using BackendTemplate.Application.Requirements.MustHavePermission;
-
-using Microsoft.AspNetCore.Authorization;
-
 using System.Security.Claims;
+using BackendTemplate.Application.Abstractions;
+using BackendTemplate.Application.Requirements.MustHavePermission;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 
 namespace BackendTemplate.Application.Requirements;
 
-public class MustHavePermissionHandler : AuthorizationHandler<MustHavePermissionRequirement>
+public sealed class MustHavePermissionHandler(IUserRepository users, IHttpContextAccessor httpContextAccessor)
+    : AuthorizationHandler<MustHavePermissionRequirement>
 {
-    private readonly IPermissionQueryRepository _permissionQueryRepository;
-
-    public MustHavePermissionHandler(IPermissionQueryRepository permissionQueryRepository)
-    {
-        _permissionQueryRepository = permissionQueryRepository;
-    }
-
     protected override async Task HandleRequirementAsync(
-        AuthorizationHandlerContext context,
-        MustHavePermissionRequirement requirement
-    )
+        AuthorizationHandlerContext context, MustHavePermissionRequirement requirement)
     {
-        // Step 1: Check claims for the required permission
-        var userPermissions = context.User.Claims
-            .Where(c => c.Type == "permission")
-            .Select(c => c.Value);
-
-        if (userPermissions.Contains(requirement.Permission))
-        {
-            context.Succeed(requirement);
+        if (context.User.Identity?.IsAuthenticated != true
+            || !Guid.TryParse(context.User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
             return;
-        }
 
-        // Step 2: Check the database for the required permission
-        var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-        if (
-            Guid.TryParse(userId, out var parsedUserId)
-            && await _permissionQueryRepository.HasPermissionAsync(
-                parsedUserId,
-                requirement.Permission
-            )
-        )
-        {
+        if (requirement.OwnerId == userId
+            || await users.HasPermissionAsync(userId, requirement.Permission,
+                httpContextAccessor.HttpContext?.RequestAborted ?? default))
             context.Succeed(requirement);
-            return;
-        }
-
-        context.Fail(); // User lacks the required permission
     }
 }

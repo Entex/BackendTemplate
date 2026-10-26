@@ -1,29 +1,16 @@
-using BackendTemplate.Application.Interface.Services;
+using BackendTemplate.Application.Events;
+using BackendTemplate.Domain.Events;
 using BackendTemplate.Domain.Events.Users;
-using MediatR;
+using Microsoft.Extensions.Logging;
 
 namespace BackendTemplate.Application.Features.Users.EventHandlers;
 
-public class UserCreatedEventHandler : INotificationHandler<UserCreatedEvent>
+public sealed class UserCreatedEventHandler(ILogger<UserCreatedEventHandler> logger) : IDomainEventHandler
 {
-    private readonly IEmailService _emailService;
-
-    public UserCreatedEventHandler(IEmailService emailService)
+    public Task HandleAsync(IDomainEvent domainEvent, CancellationToken cancellationToken)
     {
-        _emailService = emailService;
-    }
-
-    public async Task Handle(UserCreatedEvent notification, CancellationToken cancellationToken)
-    {
-        var to = notification.User.Email;
-        var subject = "BackendTemplate - Account Created, please verify your email";
-        var body =
-            $"Hello {notification.User.FirstName}, your account has been created successfully."
-            + "Please verify your email by clicking the link below."
-            + "https://backendtemplate.com/verify-email?token=1234567890"
-            + "Thank you for using BackendTemplate.";
-
-        // Send email
-        await _emailService.SendEmailAsync(to, subject, body);
+        if (domainEvent is UserCreatedEvent created)
+            logger.LogInformation("User {UserId} registered", created.UserId);
+        return Task.CompletedTask;
     }
 }

@@ -4,7 +4,7 @@ namespace BackendTemplate.Domain.Entities.Users;
 
 public class Permission : Entity
 {
-    public required string Name { get; set; }
+    public string Name { get; private set; }
     public string? Description { get; set; }
 
     public IList<Role> Roles { get; private set; } = [];

@@ -1,0 +1,29 @@
+@baseUrl = http://localhost:5000
+@token = paste-access-token-from-login
+
+### Register
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "firstName": "Alice",
+  "lastName": "Example",
+  "email": "alice@example.com",
+  "password": "correct horse battery staple"
+}
+
+### Login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "password": "correct horse battery staple"
+}
+
+### Read your profile
+GET {{baseUrl}}/api/users/me
+Authorization: Bearer {{token}}
+
+### Database readiness
+GET {{baseUrl}}/health/ready

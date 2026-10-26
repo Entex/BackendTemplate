@@ -1,56 +1,30 @@
 using BackendTemplate.Application.Exceptions;
 using BackendTemplate.Application.Requirements.Providers;
-
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 namespace BackendTemplate.Application.Behaviors;
 
-public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : notnull
+public sealed class AuthorizationBehavior<TRequest, TResponse>(
+    IAuthorizationService authorization,
+    IHttpContextAccessor httpContextAccessor)
+    : IPipelineBehavior<TRequest, TResponse> where TRequest : IMessage
 {
-    private readonly IAuthorizationService _authorizationService;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-
-    public AuthorizationBehavior(
-        IAuthorizationService authorizationService,
-        IHttpContextAccessor httpContextAccessor
-    )
+    public async ValueTask<TResponse> Handle(TRequest request,
+        MessageHandlerDelegate<TRequest, TResponse> next, CancellationToken cancellationToken)
     {
-        _authorizationService = authorizationService;
-        _httpContextAccessor = httpContextAccessor;
-    }
-
-    public async Task<TResponse> Handle(
-        TRequest request,
-        RequestHandlerDelegate<TResponse> next,
-        CancellationToken cancellationToken
-    )
-    {
-        if (request is IAuthorizationRequirementProvider authorizationProvider)
+        if (request is IAuthorizationRequirementProvider provider)
         {
-            var httpContext = _httpContextAccessor.HttpContext;
+            var user = httpContextAccessor.HttpContext?.User;
+            if (user?.Identity?.IsAuthenticated != true)
+                throw new UnauthorizedException();
 
-            if (httpContext == null)
-            {
-                throw new InvalidOperationException(
-                    "No HttpContext is available for authorization."
-                );
-            }
-
-            var user = httpContext.User;
-            var requirements = authorizationProvider.GetRequirements();
-
-            // Authorize with all requirements at once
-            var result = await _authorizationService.AuthorizeAsync(user, null, requirements);
-
+            var result = await authorization.AuthorizeAsync(user, request, provider.GetRequirements());
             if (!result.Succeeded)
-            {
-                throw new UnauthorizedException("User is not authorized to perform this action.");
-            }
+                throw new ForbiddenException();
         }
 
-        return await next();
+        return await next(request, cancellationToken);
     }
 }

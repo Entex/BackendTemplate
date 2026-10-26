@@ -12,8 +12,8 @@ public class Result<T>
         if (isSuccess && error != string.Empty)
             throw new InvalidOperationException("Successful result cannot have an error message.");
 
-        if (!isSuccess && value is not null)
-            throw new InvalidOperationException("Failed result cannot have a value.");
+        if (!isSuccess && string.IsNullOrWhiteSpace(error))
+            throw new InvalidOperationException("Failed result must have an error message.");
 
         IsSuccess = isSuccess;
         Value = value;

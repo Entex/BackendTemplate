@@ -18,7 +18,7 @@ public class Email : ValueObject
             return Result<Email>.Failure("Email should not be empty.");
         }
 
-        if (email.Length > 256)
+        if (email.Length > 254)
         {
             return Result<Email>.Failure("Email is too long.");
         }
@@ -26,7 +26,11 @@ public class Email : ValueObject
         try
         {
             var mailAddress = new System.Net.Mail.MailAddress(email);
-            return Result<Email>.Success(new Email(mailAddress.Address));
+            if (!string.Equals(mailAddress.Address, email, StringComparison.OrdinalIgnoreCase))
+            {
+                return Result<Email>.Failure("Email is invalid.");
+            }
+            return Result<Email>.Success(new Email(mailAddress.Address.ToLowerInvariant()));
         }
         catch (FormatException)
         {
